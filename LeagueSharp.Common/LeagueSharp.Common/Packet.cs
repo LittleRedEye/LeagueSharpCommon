@@ -100,7 +100,6 @@ namespace LeagueSharp.Common
             Unknown100 = 0x00,
             Unknown101 = 0x01,
             Unknown102 = 0x02,
-            Unknown104 = 0x04,
             Unknown115 = 0x15,
             Unknown116 = 0x16,
             Unknown124 = 0x24,
@@ -109,11 +108,14 @@ namespace LeagueSharp.Common
             Unknown122 = 0x22,
             /* These others could be packets with a handler */
             Unknown109 = 0x09,
+            Unknown120 = 0x20, // confirmed in game
             SpawnTurret = 0x23, // confirmed in ida
             NPCDeath = 0x26, //confirmed in ida, struct from intwars/ida
 
+            AddBuff = 0x04, // buff added by towers in new SR
             InitSpell = 0x07, //also stack count for stackables, teemo shroom, akali, etc?
             UndoToken = 0x0B,
+            ObjectCreation = 0x0D, // azir ult
             UndoConfirm = 0x27,
             OnAttack = 0x0F,
             SurrenderState = 0x0E,
@@ -303,7 +305,8 @@ namespace LeagueSharp.Common
                 {
                     var result = new GamePacket(Header);
                     result.WriteInteger(packetStruct.SourceNetworkId);
-                    result.WriteShort(ShortFromSpellSlot(packetStruct.Slot));
+                    result.WriteByte(GetSpellByte(packetStruct.Slot));
+                    result.WriteByte((byte) packetStruct.Slot);
                     result.WriteFloat(packetStruct.FromX);
                     result.WriteFloat(packetStruct.FromY);
                     result.WriteFloat(packetStruct.ToX);
@@ -321,7 +324,8 @@ namespace LeagueSharp.Common
                     var result = new Struct();
                     packet.Position = 1;
                     result.SourceNetworkId = packet.ReadInteger();
-                    result.Slot = GetSpellSlot(packet.ReadByte(), (SpellSlot) packet.ReadByte());
+                    packet.Position++;
+                    result.Slot = (SpellSlot) packet.ReadByte();
                     result.FromX = packet.ReadFloat();
                     result.FromY = packet.ReadFloat();
                     result.ToX = packet.ReadFloat();
@@ -329,48 +333,13 @@ namespace LeagueSharp.Common
                     return result;
                 }
 
-                private static short ShortFromSpellSlot(SpellSlot slot)
-                {
-                    var newSlot = (byte) slot;
-
-                    if ((byte) slot == 0x64)
-                    {
-                        newSlot = 0x0;
-                    }
-
-                    if ((byte) slot == 0x65)
-                    {
-                        newSlot = 0x1;
-                    }
-
-                    return BitConverter.ToInt16(new byte[2] { GetSpellByte(slot), newSlot }, 0);
-                }
-
-                private static SpellSlot GetSpellSlot(byte spellByte, SpellSlot spellSlot)
-                {
-                    if (spellByte != 0xE9 && spellByte != 0xEF && spellByte != 0x8B && spellByte != 0xED &&
-                        spellByte != 0x63)
-                    {
-                        return spellSlot;
-                    }
-
-                    if (spellSlot == SpellSlot.Q)
-                    {
-                        return (SpellSlot) 0x64;
-                        //Summoner 1, this is incorrect though and should be SpellSlot.Summoner1
-                    }
-
-                    if (spellSlot == SpellSlot.W)
-                    {
-                        return (SpellSlot) 0x65;
-                        //Summoner 2, this is incorrect though and should be SpellSlot.Summoner2
-                    }
-
-                    return spellSlot;
-                }
-
                 private static byte GetSpellByte(SpellSlot spell)
                 {
+                    if (Game.Version.Contains("4.19") && (spell == ((SpellSlot) 4) || spell == ((SpellSlot) 5)))
+                    {
+                        return 0xEF;
+                    }
+
                     switch (spell)
                     {
                         case SpellSlot.Q:
@@ -397,10 +366,6 @@ namespace LeagueSharp.Common
                             return 0;
                         case SpellSlot.Recall:
                             return 0;
-                        case (SpellSlot) 0x64:
-                            return 0xEF;
-                        case (SpellSlot) 0x65:
-                            return 0xEF;
                         case SpellSlot.Unknown:
                             return 0;
                         default:
@@ -582,7 +547,8 @@ namespace LeagueSharp.Common
                         SlotByte = (byte) slotId;
                         if (SlotByte >= (byte) SpellSlot.Item1 && SlotByte <= (byte) SpellSlot.Trinket)
                         {
-                            SlotByte = (byte) (SlotByte - 4);
+                            var add = Game.Version.Contains("4.19") ? 6 : 4;
+                            SlotByte = (byte) (SlotByte - add);
                         }
                         NetworkId = networkId == -1 ? ObjectManager.Player.NetworkId : networkId;
                     }
@@ -1114,6 +1080,39 @@ namespace LeagueSharp.Common
 
             #endregion
 
+            #region ObjectCreation
+
+            /// <summary>
+            /// Object creation.
+            /// </summary>
+            public static class ObjectCreation
+            {
+                public static byte SubHeader = (byte) MultiPacketType.ObjectCreation;
+
+                public static ReturnStruct Decoded(byte[] data)
+                {
+                    var packet = new GamePacket(data);
+                    var pStruct = new ReturnStruct();
+                    pStruct.NetworkId = packet.ReadInteger(1);
+
+                    pStruct.Unit = ObjectManager.GetUnitByNetworkId<Obj_AI_Hero>(pStruct.NetworkId);
+                    pStruct.UnknownFloat = packet.ReadFloat(7);
+                    pStruct.UnknownFloat2 = packet.ReadFloat();
+
+                    return pStruct;
+                }
+
+                public struct ReturnStruct
+                {
+                    public int NetworkId;
+                    public Obj_AI_Base Unit;
+                    public float UnknownFloat;
+                    public float UnknownFloat2;
+                }
+            }
+
+            #endregion
+
             #region Unknown
 
             #region Unknown100
@@ -1223,15 +1222,15 @@ namespace LeagueSharp.Common
 
             #endregion
 
-            #region Unknown104
+            #region AddBuff
 
             /// <summary>
             ///     Unknown
             ///     Struct from ida, this packet is related to spell slots.
             /// </summary>
-            public static class Unknown104
+            public static class AddBuff
             {
-                public static byte SubHeader = (byte) MultiPacketType.Unknown104;
+                public static byte SubHeader = (byte) MultiPacketType.AddBuff;
 
                 public static ReturnStruct Decoded(byte[] data)
                 {
@@ -2456,6 +2455,52 @@ namespace LeagueSharp.Common
                     public int NetworkId;
                     public SpellSlot ToSlot;
                     public Obj_AI_Hero Unit;
+                }
+            }
+
+            #endregion
+
+            #region ChangeSpellSlot
+
+            /// <summary>
+            /// Packet received on spell slot changing.
+            /// </summary>
+            public class ChangeSpellSlot
+            {
+                public static byte Header = 0x17;
+
+                public static Struct Decoded(byte[] data)
+                {
+                    var packet = new GamePacket(data);
+                    var result = new Struct();
+
+                    result.NetworkId = packet.ReadInteger(1);
+                    result.Unit = ObjectManager.GetUnitByNetworkId<Obj_AI_Base>(result.NetworkId);
+                    result.Slot = (SpellSlot) (packet.ReadByte());
+                    result.UnknownByte = packet.ReadByte();
+                    result.SpellString = packet.ReadString(11);
+                    return result;
+                }
+
+                public static GamePacket Encoded(Struct pStruct)
+                {
+                    var packet = new GamePacket(Header);
+                    packet.WriteInteger(pStruct.NetworkId);
+                    packet.WriteByte((byte) pStruct.Slot);
+                    packet.WriteByte(pStruct.UnknownByte);
+                    packet.WriteByte(2);
+                    packet.WriteByte(0, 3);
+                    packet.WriteString(pStruct.SpellString);
+                    return packet;
+                }
+
+                public struct Struct
+                {
+                    public int NetworkId;
+                    public SpellSlot Slot;
+                    public string SpellString;
+                    public Obj_AI_Base Unit;
+                    public byte UnknownByte; // from slot?
                 }
             }
 

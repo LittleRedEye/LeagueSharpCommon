@@ -945,7 +945,7 @@ namespace LeagueSharp.Common
                 //Q
                 new DamageSpell{Slot = SpellSlot.Q, DamageType = DamageType.Physical, Damage = (source, target, level) => new double[]{80, 110, 140, 170, 200}[level] + new double[]{60, 75, 90, 105, 120}[level]/100 * source.FlatPhysicalDamageMod },
                 //W
-                new DamageSpell{Slot = SpellSlot.W, DamageType = DamageType.Magical, Damage = (source, target, level) => new double[]{60, 100, 140, 180, 220}[level] + 0.9 * source.FlatMagicDamageMod + 0.3 * source.FlatPhysicalDamageMod },
+                new DamageSpell{Slot = SpellSlot.W, DamageType = DamageType.Magical, Damage = (source, target, level) => new double[]{60, 100, 140, 180, 220}[level] + 0.9 * source.FlatMagicDamageMod },
                 //R - per shot
                 new DamageSpell{Slot = SpellSlot.R, DamageType = DamageType.Physical, Damage = (source, target, level) => new double[]{40, 50, 60}[level] + 0.1 * source.FlatMagicDamageMod + 0.25 * source.FlatPhysicalDamageMod },
             });
@@ -1259,7 +1259,7 @@ namespace LeagueSharp.Common
             Spells.Add("Ryze", new List<DamageSpell>
             {
                 //Q
-                new DamageSpell{Slot = SpellSlot.Q, DamageType = DamageType.Magical, Damage = (source, target, level) => new double[]{60, 85, 110, 135, 160}[level] + 0.4 * source.FlatMagicDamageMod + 0.065 * source.MaxMana },
+                new DamageSpell{Slot = SpellSlot.Q, DamageType = DamageType.Magical, Damage = (source, target, level) => new double[]{40, 60, 80, 100, 120}[level] + 0.4 * source.FlatMagicDamageMod + 0.065 * source.MaxMana },
                 //W
                 new DamageSpell{Slot = SpellSlot.W, DamageType = DamageType.Magical, Damage = (source, target, level) => new double[]{60, 95, 130, 165, 200}[level] + 0.6 * source.FlatMagicDamageMod + 0.045 * source.MaxMana },
                 //E
